@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Chicago Citation Generator
+  Copyright (c) 2026 G. Michael Rapp
+
+  This page is free software under the GNU Affero General Public License,
+  version 3 or later. See LICENSE.
+
+  It contains citeproc-js (c) Frank Bennett, used under the AGPL; the Chicago
+  Manual of Style 18th edition (notes and bibliography) CSL style by the Citation
+  Style Language project, under CC BY-SA 3.0; and the CSL en-US locale, under
+  CC BY-SA 3.0. See NOTICE.md.
+
+  Not affiliated with or endorsed by the University of Chicago Press.
+  SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Free, open-source Chicago Manual of Style (18th edition) notes-and-bibliography citation generator: full notes, shortened notes, and bibliography entries, with checks for common mistakes. Runs entirely in your browser.">
+<title>Chicago Citation Generator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%237A1F2B'/%3E%3Ctext x='16' y='23' font-family='Georgia,serif' font-size='20' font-weight='700' fill='white' text-anchor='middle'%3EC%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #F5F2F0; --surface: #FFFFFF; --sheet: #FFFFFF; --ink: #24171A; --muted: #6A5A5D; --line: #DACFCF;
+  --accent: #7A1F2B; --accent-ink: #FFFFFF; --accent-soft: #F3E1E3;
+  --fix: #9E2219; --fix-bg: #FBE3E0; --check: #6F4B00; --check-bg: #FBEDC4; --note: #35566B; --note-bg: #E3EDF3; --ok: #2A6637;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-ref: 'Times New Roman', Times, 'Liberation Serif', serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171112; --surface: #211819; --sheet: #281D1F; --ink: #EFE5E6; --muted: #B09FA2; --line: #3E2F31;
+    --accent: #EBA3AC; --accent-ink: #2A0E12; --accent-soft: #3D2226;
+    --fix: #FFA79C; --fix-bg: #3F1D1A; --check: #F2CD6B; --check-bg: #3A2E10; --note: #A9C9DB; --note-bg: #1C323E; --ok: #8FD19E;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171112; --surface: #211819; --sheet: #281D1F; --ink: #EFE5E6; --muted: #B09FA2; --line: #3E2F31;
+  --accent: #EBA3AC; --accent-ink: #2A0E12; --accent-soft: #3D2226;
+  --fix: #FFA79C; --fix-bg: #3F1D1A; --check: #F2CD6B; --check-bg: #3A2E10; --note: #A9C9DB; --note-bg: #1C323E; --ok: #8FD19E;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-ui); font-size: 15px; line-height: 1.45; }
+[hidden] { display: none !important; }
+.wrap { max-width: 1180px; margin-inline: auto; padding: 28px clamp(16px, 3vw, 32px) 56px; display: flex; flex-direction: column; gap: 24px; }
+.mast { display: flex; flex-direction: column; gap: 10px; }
+.masttop { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.mast h1 { margin: 0; font-size: 26px; font-weight: 650; letter-spacing: -0.01em; color: var(--accent); }
+.mast p { margin: 0; color: var(--muted); max-width: 66ch; }
+.ver { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--accent); background: var(--accent-soft); border-radius: 3px; padding: 2px 7px; vertical-align: middle; margin-left: 4px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 460px); gap: 32px; align-items: start; }
+.form { min-width: 0; display: flex; flex-direction: column; }
+.out { min-width: 0; position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); gap: 24px; } .out { position: static; max-height: none; overflow: visible; order: -1; } }
+.slot { border-top: 1px solid var(--line); padding-block: 18px 22px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.slot:first-child { border-top: 0; padding-top: 0; }
+.slot h2 { margin: 0; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.slot h2 .aside { font-size: 12.5px; font-weight: 400; color: var(--muted); }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.labrow { display: flex; align-items: center; gap: 6px; }
+.field label, .labrow label, .field .label { font-size: 13px; font-weight: 500; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 0; }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.withbtn { display: flex; gap: 6px; min-width: 0; }
+.withbtn input { flex: 1 1 auto; }
+input[type="text"], textarea, select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; width: 100%; min-width: 0; }
+textarea { resize: vertical; line-height: 1.4; }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.75; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.types { display: flex; flex-wrap: wrap; gap: 6px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chip span { display: inline-block; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 13.5px; }
+.chip input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+.check input { margin-top: 3px; }
+.btn { font: inherit; font-size: 13.5px; font-weight: 500; padding: 7px 12px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.quiet { background: transparent; border-color: transparent; color: var(--accent); padding-inline: 6px; }
+.btn.small { font-size: 12.5px; padding: 4px 9px; }
+.formbar, .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sheet { background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; padding: 18px; display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { margin: 0; font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: flex; gap: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.ref { font-family: var(--font-ref); font-size: 17px; line-height: 1.55; overflow-wrap: anywhere; margin: 0; padding-left: 2em; text-indent: -2em; min-height: 3em; }
+.ref.empty { font-family: var(--font-ui); font-size: 14px; color: var(--muted); padding-left: 0; text-indent: 0; }
+.cite { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: baseline; }
+.out-k { font-size: 12.5px; color: var(--muted); margin: 0; }
+.note-out { font-family: var(--font-ref); font-size: 17px; line-height: 1.55; overflow-wrap: anywhere; margin: 0; text-indent: 2em; min-height: 1.5em; }
+.ref.none { font-family: var(--font-ui); font-size: 13.5px; color: var(--muted); padding-left: 0; text-indent: 0; min-height: 0; }
+.saved .tagline { font-family: var(--font-ui); font-size: 11.5px; color: var(--muted); text-indent: 0; display: block; }
+.cite .k { font-size: 12.5px; color: var(--muted); }
+.cite .v { font-family: var(--font-ref); font-size: 16px; overflow-wrap: anywhere; }
+.status { font-size: 12.5px; color: var(--ok); min-height: 1.45em; margin: 0; }
+.status.bad { color: var(--fix); }
+.checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.checks li { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 13.5px; }
+.tag { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 0; border-radius: 3px; text-align: center; margin-top: 1px; }
+.tag.fix { background: var(--fix-bg); color: var(--fix); } .tag.check { background: var(--check-bg); color: var(--check); } .tag.note { background: var(--note-bg); color: var(--note); }
+#noteHint:empty { display: none; }
+.allclear { font-size: 13.5px; color: var(--ok); margin: 0; }
+.block { border-top: 1px solid var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.saved { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.saved li { border-top: 1px solid var(--line); padding-block: 10px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; }
+.saved li:first-child { border-top: 0; padding-top: 0; }
+.saved .txt { font-family: var(--font-ref); font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; padding-left: 1.6em; text-indent: -1.6em; }
+.saved .actions { grid-column: 2; }
+.saved input { margin-top: 5px; }
+.filemsg { font-size: 12.5px; color: var(--ok); margin: 0; } .filemsg.bad { color: var(--fix); } .filemsg:empty { display: none; }
+.foot { color: var(--muted); font-size: 12.5px; margin: 0; max-width: 76ch; }
+.foot a { color: var(--accent); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.seg label { position: relative; font-size: 12.5px; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { display: block; padding: 4px 10px; }
+.seg input:checked + span { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+.optline { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.tip { position: relative; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 16px; width: 16px; height: 16px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--muted); font: 500 10.5px/1 var(--font-mono); letter-spacing: 0; text-transform: none; cursor: help; }
+.tip::after { content: ''; position: absolute; inset: -6px; }
+.tip:hover, .tip[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.tipbox { position: fixed; z-index: 60; left: 0; top: 0; width: max-content; max-width: min(320px, calc(100vw - 24px)); background: var(--ink); color: var(--bg); font-size: 12.5px; line-height: 1.45; padding: 9px 11px; border-radius: 5px; box-shadow: 0 4px 14px rgba(0,0,0,.25); pointer-events: none; }
+</style>
+<script>
+(function () { try { var t = JSON.parse(localStorage.getItem('cms-cite-theme-v1')); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {} })();
+</script>
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <div class="masttop">
+      <h1>Chicago Citation Generator <span class="ver">v1.0</span></h1>
+      <div class="optline"><span id="themeLabel">Theme</span>
+        <span class="seg" role="radiogroup" aria-labelledby="themeLabel">
+          <label><input type="radio" name="theme" id="themeAuto" value="auto" checked><span>Auto</span></label>
+          <label><input type="radio" name="theme" id="themeLight" value="light"><span>Light</span></label>
+          <label><input type="radio" name="theme" id="themeDark" value="dark"><span>Dark</span></label>
+        </span>
+      </div>
+    </div>
+    <p>Fill in what you know about the source. The full note, the shortened note, and the bibliography entry build as you type, in the notes-and-bibliography style of <i>The Chicago Manual of Style</i>, 18th edition. Each <b>?</b> explains the part beside it.</p>
+  </header>
+
+  <div class="layout">
+    <form class="form" id="f" autocomplete="off" novalidate>
+      <div class="slot">
+        <h2 id="h-type">Source type</h2>
+        <fieldset class="types" id="types" aria-labelledby="h-type"></fieldset>
+        <div class="formbar">
+          <button type="button" class="btn small" id="clearBtn">Clear the form</button>
+          <button type="button" class="btn quiet small" id="sampleBtn">Show an example for this type</button>
+        </div>
+      </div>
+
+      <div class="slot" id="s-who">
+        <h2 id="h-who">Who</h2>
+        <div class="field" data-f="authors"><label for="authors" id="authorsLabel">Authors</label><textarea id="authors" rows="3"></textarea><p class="hint" id="authorsHint"></p></div>
+        <div class="field" data-f="handle" style="max-width:280px"><label for="handle">Handle</label><input type="text" id="handle" placeholder="@petesouza"></div>
+        <div class="field" data-f="editors"><label for="editors" id="editorsLabel">Editors</label><textarea id="editors" rows="2" placeholder="Surname, Given names (one per line)"></textarea><p class="hint" id="editorsHint"></p></div>
+        <div class="field" data-f="translators"><label for="translators">Translators</label><textarea id="translators" rows="1" placeholder="Surname, Given names (one per line)"></textarea></div>
+      </div>
+
+      <div class="slot" id="s-when">
+        <h2 id="h-when">When</h2>
+        <div class="row">
+          <div class="field" data-f="date"><label for="date" id="dateLabel">Date published</label><input type="text" id="date" placeholder="2019, or October 31, 2019"><p class="hint" id="dateHint"></p></div>
+          <div class="field" data-f="dateKind"><label for="dateKind">That date is when the page was</label>
+            <select id="dateKind"><option value="">Published</option><option value="modified">Last modified</option></select></div>
+        </div>
+      </div>
+
+      <div class="slot" id="s-what">
+        <h2 id="h-what">What</h2>
+        <div class="field" data-f="title">
+          <label for="title" id="titleLabel">Title</label>
+          <input type="text" id="title">
+          <p class="hint" id="titleHint"></p>
+        </div>
+        <div class="field" data-f="shortTitle"><label for="shortTitle">Short title</label><input type="text" id="shortTitle"><p class="hint" id="shortTitleHint">For shortened notes. Leave blank to use the main title without its subtitle or an opening A, An, or The.</p></div>
+        <div class="field" id="descWrap"><label for="description" id="descLabel">No title? Describe it</label><input type="text" id="description" placeholder="to Thomas Jefferson"><p class="hint" id="descHint">Used only when there is no title. A description is not put in quotation marks or italics.</p></div>
+        <div class="field" data-f="prompt"><label for="prompt">The prompt you gave it</label><textarea id="prompt" rows="2" placeholder="Explain how to make pizza dough from common household ingredients"></textarea><p class="hint">Chicago puts the prompt in the note when you quote or discuss the response.</p></div>
+      </div>
+
+      <div class="slot" id="s-where">
+        <h2 id="h-where">Where it was published</h2>
+        <div class="field" data-f="container"><label for="container" id="containerLabel">Journal</label><input type="text" id="container"><p class="hint" id="containerHint"></p></div>
+        <div class="row">
+          <div class="field" data-f="volume"><label for="volume" id="volumeLabel">Volume</label><input type="text" id="volume" placeholder="111"></div>
+          <div class="field" data-f="issue"><label for="issue">Issue</label><input type="text" id="issue" placeholder="2"></div>
+          <div class="field" data-f="pages"><label for="pages" id="pagesLabel">Pages</label><input type="text" id="pages" placeholder="165-76"></div>
+          <div class="field" data-f="articleNumber"><label for="articleNumber">Article number</label><input type="text" id="articleNumber" placeholder="e0209899"></div>
+        </div>
+        <div class="row">
+          <div class="field" data-f="edition"><label for="edition">Edition</label><input type="text" id="edition" placeholder="2nd, or Rev."></div>
+          <div class="field" data-f="reportType"><label for="reportType">Report series or kind</label><input type="text" id="reportType" placeholder="Report"></div>
+          <div class="field" data-f="reportNumber"><label for="reportNumber">Report number</label><input type="text" id="reportNumber" placeholder="GAO-21-23"></div>
+          <div class="field" data-f="origDate"><label for="origDate">First published</label><input type="text" id="origDate" placeholder="1851"></div>
+        </div>
+        <div class="field" data-f="thesisType"><label for="thesisType">Kind of thesis</label>
+          <select id="thesisType"><option value="PhD diss.">PhD dissertation</option><option value="master's thesis">Master's thesis</option><option value="EdD diss.">EdD dissertation</option><option value="DMA diss.">DMA dissertation</option></select></div>
+        <div class="field" data-f="presentationType"><label for="presentationType">Kind of presentation</label>
+          <select id="presentationType"><option value="">Paper</option><option value="poster">Poster</option><option value="lecture">Lecture</option><option value="keynote address">Keynote address</option><option value="panel discussion">Panel discussion</option></select></div>
+        <div class="row">
+          <div class="field" data-f="event"><label for="event">Conference or event</label><input type="text" id="event" placeholder="Annual Meeting of the American Historical Association"></div>
+          <div class="field" data-f="place"><label for="place" id="placeLabel">Where it was held</label><input type="text" id="place" placeholder="Chicago"></div>
+        </div>
+        <div class="row">
+          <div class="field" data-f="platform"><label for="platform" id="platformLabel">Platform</label><input type="text" id="platform"></div>
+          <div class="field" data-f="postType"><label for="postType">Kind of post</label>
+            <select id="postType"><option value="">Post</option><option value="photo">Photo</option><option value="video">Video</option><option value="story">Story</option><option value="post">Post (say so)</option></select></div>
+          <div class="field" data-f="duration"><label for="duration">Running time</label><input type="text" id="duration" placeholder="2:26, or 9 min., 15 sec."></div>
+        </div>
+        <div class="field" data-f="collection"><label for="collection">Collection</label><input type="text" id="collection" placeholder="Adams Family Papers"></div>
+        <div class="row">
+          <div class="field" data-f="repository"><label for="repository">Library or archive</label><input type="text" id="repository" placeholder="Massachusetts Historical Society"></div>
+          <div class="field" data-f="boxFolder"><label for="boxFolder">Box, folder, or item number</label><input type="text" id="boxFolder" placeholder="box 3, folder 2"></div>
+        </div>
+        <div class="field" data-f="publisher"><label for="publisher" id="publisherLabel">Publisher</label><input type="text" id="publisher"><p class="hint" id="publisherHint"></p></div>
+        <div class="field" data-f="format"><label for="format">E-book format</label><input type="text" id="format" placeholder="Kindle"><p class="hint">Only for an e-book with no DOI or URL to give.</p></div>
+      </div>
+
+      <div class="slot" id="s-link">
+        <h2 id="h-link">Where to find it</h2>
+        <div class="field" data-f="doi"><label for="doi">DOI</label><input type="text" id="doi" placeholder="10.1086/685810" inputmode="url"><p class="hint">Use the DOI whenever the source has one. It becomes a https://doi.org/ link.</p></div>
+        <div class="field" data-f="url"><label for="url" id="urlLabel">URL</label><input type="text" id="url" placeholder="https://" inputmode="url"><p class="hint" id="urlHint"></p></div>
+        <div class="field" data-f="database"><label for="database">Database</label><input type="text" id="database" placeholder="JSTOR"><p class="hint">If you read it in a library database and there is no DOI or stable URL, name the database instead.</p></div>
+        <div class="field" data-f="accessed" style="max-width:320px"><label for="accessed">Accessed</label>
+          <div class="withbtn"><input type="text" id="accessed" placeholder="Only if it has no date"><button type="button" class="btn small" id="todayBtn">Today</button></div></div>
+      </div>
+
+      <div class="slot" id="s-intext">
+        <h2 id="h-intext">This note</h2>
+        <div class="row">
+          <div class="field"><label for="locType">Point to a place in the source</label>
+            <select id="locType"><option value="">Nothing specific</option><option value="page">Page or pages</option><option value="para">Paragraph</option><option value="section">Section</option><option value="chapter">Chapter</option><option value="volume">Volume</option><option value="other">Something else</option></select></div>
+          <div class="field" id="locWrap" hidden><label for="locator" id="locatorLabel">Page</label><input type="text" id="locator"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="quote"> <span>I am quoting it word for word</span></label>
+        <label class="check"><input type="checkbox" id="secondary"> <span>I am quoting something this source quotes ("quoted in")</span></label>
+        <div class="field" id="origWrap" hidden><label for="original">The original, as it should appear before "quoted in"</label><textarea id="original" rows="2" placeholder='Louis Zukofsky, "Sincerity and Objectification," Poetry 37 (February 1931): 269'></textarea><p class="hint">Give what you know of the original. Only the source you read goes in the bibliography.</p></div>
+      </div>
+    </form>
+
+    <aside class="out" aria-label="Your citation">
+      <div class="sheet">
+        <div class="block" style="border-top:0;padding-top:0">
+          <p class="eyebrow"><span id="lab-full">First note</span><button type="button" class="btn small" id="copyFull" style="letter-spacing:0;text-transform:none">Copy</button></p>
+          <p class="note-out" id="full" aria-live="polite"></p>
+        </div>
+        <div class="block">
+          <p class="eyebrow"><span id="lab-short">Later notes</span><button type="button" class="btn small" id="copyShort" style="letter-spacing:0;text-transform:none">Copy</button></p>
+          <p class="note-out" id="short"></p>
+        </div>
+        <div class="block">
+          <p class="eyebrow"><span id="lab-ref">Bibliography entry</span></p>
+          <p class="ref" id="ref"></p>
+          <div class="actions" id="refActions">
+            <button type="button" class="btn primary" id="copyRef">Copy with italics</button>
+            <button type="button" class="btn" id="copyRefPlain">Copy plain</button>
+          </div>
+        </div>
+        <p class="hint" id="noteHint"></p>
+        <p class="status" id="status" role="status"></p>
+        <textarea id="fallbackBox" rows="4" readonly hidden aria-label="Text to copy by hand"></textarea>
+        <div class="block">
+          <p class="eyebrow"><span id="lab-checks">Checks</span></p>
+          <ul class="checks" id="checks"></ul>
+          <p class="allclear" id="allclear" hidden>Nothing to fix.</p>
+        </div>
+        <div class="block">
+          <p class="eyebrow"><span id="lab-list">My sources <span id="savedCount"></span></span>
+            <button type="button" class="btn small primary" id="addBtn" style="letter-spacing:0;text-transform:none">Add to my list</button></p>
+          <ul class="saved" id="saved"></ul>
+          <p class="hint" id="savedEmpty">Sources you add stay in this browser. Their bibliography entries are sorted the way Chicago sorts a bibliography.</p>
+          <div id="savedTools" hidden>
+            <div class="actions">
+              <button type="button" class="btn small" id="copyList">Copy the bibliography</button>
+              <button type="button" class="btn small" id="expDocx">Word</button>
+              <button type="button" class="btn small" id="expMd">Markdown</button>
+              <button type="button" class="btn quiet small" id="clearList">Empty the list</button>
+            </div>
+            <div class="cite" style="margin-top:10px"><span class="k">Ticked together</span><span class="v" id="group"></span><button type="button" class="btn small" id="copyGroup">Copy</button></div>
+            <p class="hint">Tick two or more sources to cite them in one note, separated by semicolons, in the order they appear in the list. Edit the order to match your sentence.</p>
+          </div>
+        </div>
+        <div class="block">
+          <p class="eyebrow"><span id="lab-file">List file</span></p>
+          <div class="actions">
+            <button type="button" class="btn small" id="saveFile">Save list to a file</button>
+            <button type="button" class="btn small" id="openFile">Open a list file</button>
+          </div>
+          <p class="hint">A list file keeps every field of every source, so you can reopen it here on any computer and keep editing.</p>
+          <p class="filemsg" id="fileMsg" role="status"></p>
+          <input type="file" id="pickFile" accept=".json,application/json" hidden>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <p class="foot">Version 1.0. Follows the notes-and-bibliography system of <i>The Chicago Manual of Style</i>, 18th edition, through the community-maintained Chicago style from the Citation Style Language project. Not affiliated with or endorsed by the University of Chicago Press. Check the result against your instructor's requirements, which come first.</p>
+  <p class="foot">This page runs entirely in your browser. What you type stays on this device and is never sent anywhere.</p>
+  <p class="foot">&copy; 2026 G. Michael Rapp. Free and open-source software under the GNU Affero General Public License. Formatting by citeproc-js and the CSL Chicago style (CC BY-SA 3.0). Source code and credits: <a href="https://github.com/gmichaelrapp/Chicago_Cites">github.com/gmichaelrapp/Chicago_Cites</a>.</p>
+</div>
+
+<script id="citeproc">/*CITEPROC*/</script>
+<script type="application/xml" id="style-csl">/*STYLE*/</script>
+<script type="application/xml" id="locale-en-US">/*LOCALE*/</script>
+<script id="core">/*CORE*/</script>
+<script id="ui">/*UI*/</script>
+</body>
+</html>
